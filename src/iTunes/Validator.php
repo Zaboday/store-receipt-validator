@@ -7,189 +7,237 @@ use ReceiptValidator\RunTimeException;
 class Validator
 {
 
-  const ENDPOINT_SANDBOX = 'https://sandbox.itunes.apple.com/verifyReceipt';
-  const ENDPOINT_PRODUCTION = 'https://buy.itunes.apple.com/verifyReceipt';
+    const ENDPOINT_SANDBOX = 'https://sandbox.itunes.apple.com/verifyReceipt';
+    const ENDPOINT_PRODUCTION = 'https://buy.itunes.apple.com/verifyReceipt';
 
-  /**
-   * endpoint url
-   *
-   * @var string
-   */
-  protected $_endpoint;
+    /**
+     * endpoint url
+     *
+     * @var string
+     */
+    protected $_endpoint;
 
-  /**
-   * itunes receipt data, in base64 format
-   *
-   * @var string
-   */
-  protected $_receiptData;
+    /**
+     * itunes receipt data, in base64 format
+     *
+     * @var string
+     */
+    protected $_receiptData;
 
 
-  /**
-   * The shared secret is a unique code to receive your In-App Purchase receipts.
-   * Without a shared secret, you will not be able to test or offer your automatically
-   * renewable In-App Purchase subscriptions.
-   *
-   * @var string
-   */
-  protected $_sharedSecret = null;
+    /**
+     * The shared secret is a unique code to receive your In-App Purchase receipts.
+     * Without a shared secret, you will not be able to test or offer your automatically
+     * renewable In-App Purchase subscriptions.
+     *
+     * @var string
+     */
+    protected $_sharedSecret = null;
 
-  /**
-   * Guzzle http client
-   *
-   * @var \GuzzleHttp\Client
-   */
-  protected $_client = null;
+    /**
+     * @var boolean
+     */
+    protected $sandbox;
 
-  public function __construct($endpoint = self::ENDPOINT_PRODUCTION)
-  {
-    if ($endpoint != self::ENDPOINT_PRODUCTION && $endpoint != self::ENDPOINT_SANDBOX) {
-      throw new RunTimeException("Invalid endpoint '{$endpoint}'");
+    /**
+     * @var array
+     */
+    protected $httpResponse;
+
+    /**
+     * Guzzle http client
+     *
+     * @var \GuzzleHttp\Client
+     */
+    protected $_client = null;
+
+    /**
+     * get receipt data
+     *
+     * @return string
+     */
+    public function getReceiptData()
+    {
+        return $this->_receiptData;
     }
 
-    $this->_endpoint = $endpoint;
-  }
+    /**
+     * set receipt data, either in base64, or in json
+     *
+     * @param string $receiptData
+     * @return \ReceiptValidator\iTunes\Validator;
+     */
+    function setReceiptData($receiptData)
+    {
+        if (strpos($receiptData, '{') !== false) {
+            $this->_receiptData = base64_encode($receiptData);
+        } else {
+            $this->_receiptData = $receiptData;
+        }
 
-  /**
-   * get receipt data
-   *
-   * @return string
-   */
-  public function getReceiptData()
-  {
-    return $this->_receiptData;
-  }
-
-  /**
-   * set receipt data, either in base64, or in json
-   *
-   * @param string $receiptData
-   * @return \ReceiptValidator\iTunes\Validator;
-   */
-  function setReceiptData($receiptData)
-  {
-    if (strpos($receiptData, '{') !== false) {
-      $this->_receiptData = base64_encode($receiptData);
-    } else {
-      $this->_receiptData = $receiptData;
+        return $this;
     }
 
-    return $this;
-  }
-
-  /**
-   * @return string
-   */
-  public function getSharedSecret()
-  {
-    return $this->_sharedSecret;
-  }
-
-  /**
-   * @param string $sharedSecret
-   */
-  public function setSharedSecret($sharedSecret)
-  {
-    $this->_sharedSecret = $sharedSecret;
-
-    return $this;
-  }
-
-  /**
-   * get endpoint
-   *
-   * @return string
-   */
-  public function getEndpoint()
-  {
-    return $this->_endpoint;
-  }
-
-  /**
-   * set endpoint
-   *
-   * @param string $endpoint
-   * @return\ReceiptValidator\iTunes\Validator;
-   */
-  function setEndpoint($endpoint)
-  {
-    $this->_endpoint = $endpoint;
-
-    return $this;
-  }
-
-  /**
-   * returns the Guzzle client
-   *
-   * @return \GuzzleHttp\Client
-   */
-  protected function getClient()
-  {
-    if ($this->_client == null) {
-      $this->_client = new \GuzzleHttp\Client(['base_uri' => $this->_endpoint]);
+    /**
+     * @return string
+     */
+    public function getSharedSecret()
+    {
+        return $this->_sharedSecret;
     }
 
-    return $this->_client;
-  }
+    /**
+     * @param string $sharedSecret
+     */
+    public function setSharedSecret($sharedSecret)
+    {
+        $this->_sharedSecret = $sharedSecret;
 
-  /**
-   * encode the request in json
-   *
-   * @return string
-   */
-  private function encodeRequest()
-  {
-    $request = array('receipt-data' => $this->getReceiptData());
-
-    if (!is_null($this->_sharedSecret)) {
-
-      $request['password'] = $this->_sharedSecret;
+        return $this;
     }
 
-    return json_encode($request);
-  }
-
-  /**
-   * validate the receipt data
-   *
-   * @param string $receiptData
-   * @param string $sharedSecret
-   *
-   * @return Response
-   */
-  public function validate($receiptData = null, $sharedSecret = null)
-  {
-
-    if ($receiptData != null) {
-      $this->setReceiptData($receiptData);
+    /**
+     * get endpoint
+     *
+     * @return string
+     */
+    public function getEndpoint()
+    {
+        return $this->_endpoint;
     }
 
-    if ($sharedSecret != null) {
-      $this->setSharedSecret($sharedSecret);
+    /**
+     * set endpoint
+     *
+     * @param string $endpoint
+     * @return\ReceiptValidator\iTunes\Validator;
+     */
+    function setEndpoint($endpoint)
+    {
+        $this->_endpoint = $endpoint;
+
+        return $this;
     }
 
-    $httpResponse = $this->getClient()->request('POST', null, ['body' => $this->encodeRequest()]);
+    /**
+     * returns the Guzzle client
+     *
+     * @return \GuzzleHttp\Client
+     */
+    protected function getClient()
+    {
+        if ($this->_client == null) {
+            $this->_client = new \GuzzleHttp\Client(['base_uri' => $this->getEndpoint()]);
+        }
 
-    if ($httpResponse->getStatusCode() != 200) {
-      throw new RunTimeException('Unable to get response from itunes server');
+        return $this->_client;
     }
 
-    $response = new Response(json_decode($httpResponse->getBody(), true));
+    /**
+     * encode the request in json
+     *
+     * @return string
+     */
+    private function encodeRequest()
+    {
+        $request = array('receipt-data' => $this->getReceiptData());
 
-    // on a 21007 error retry the request in the sandbox environment (if the current environment is Production)
-    // these are receipts from apple review team
-    if ($this->_endpoint == self::ENDPOINT_PRODUCTION && $response->getResultCode() == Response::RESULT_SANDBOX_RECEIPT_SENT_TO_PRODUCTION) {
-      $client = new \GuzzleHttp\Client(['base_uri' => self::ENDPOINT_SANDBOX]);
+        if (!is_null($this->_sharedSecret)) {
 
-      $httpResponse = $client->request('POST', null, ['body' => $this->encodeRequest()]);
+            $request['password'] = $this->_sharedSecret;
+        }
 
-      if ($httpResponse->getStatusCode() != 200) {
-        throw new RunTimeException('Unable to get response from itunes server');
-      }
-
-      $response = new Response(json_decode($httpResponse->getBody(), true));
+        return json_encode($request);
     }
 
-    return $response;
-  }
+    /**
+     * validate the receipt data
+     *
+     * @param string $receiptData
+     * @param string $sharedSecret
+     *
+     * @return Response
+     */
+    public function validate($receiptData = null, $sharedSecret = null)
+    {
+        if ($this->_endpoint != self::ENDPOINT_PRODUCTION && $this->_endpoint != self::ENDPOINT_SANDBOX) {
+            throw new RunTimeException(sprintf("Invalid endpoint: ", $this->_endpoint));
+        }
+
+        if ($receiptData != null) {
+            $this->setReceiptData($receiptData);
+        }
+
+        if ($sharedSecret != null) {
+            $this->setSharedSecret($sharedSecret);
+        }
+        $this->setHttpResponse(null);
+        $httpResponse = $this->getClient()->request('POST', null, ['body' => $this->encodeRequest()]);
+
+        if ($httpResponse->getStatusCode() != 200) {
+            throw new RunTimeException('Unable to get response from itunes server');
+        }
+
+        $this->setHttpResponse(json_decode($httpResponse->getBody(), true));
+
+        $response = new Response($this->getHttpResponse());
+
+        // on a 21007 error retry the request in the sandbox environment (if the current environment is Production)
+        // these are receipts from apple review team
+        if ($this->_endpoint == self::ENDPOINT_PRODUCTION && $response->getResultCode() == Response::RESULT_SANDBOX_RECEIPT_SENT_TO_PRODUCTION) {
+            $this->setHttpResponse(null);
+            $client = new \GuzzleHttp\Client(['base_uri' => self::ENDPOINT_SANDBOX]);
+
+            $httpResponse = $client->request('POST', null, ['body' => $this->encodeRequest()]);
+
+            if ($httpResponse->getStatusCode() != 200) {
+                throw new RunTimeException('Unable to get response from itunes server');
+            }
+            $this->setHttpResponse(json_decode($httpResponse->getBody(), true));
+            $response = new Response($this->getHttpResponse());
+        }
+
+        return $response;
+    }
+
+    /**
+     * @return boolean
+     */
+    public function isSandbox()
+    {
+        return $this->sandbox;
+    }
+
+    /**
+     * @param boolean $sandbox
+     * @return $this
+     */
+    public function setSandbox($sandbox)
+    {
+        $this->sandbox = $sandbox;
+        if ($sandbox) {
+            $this->setEndpoint(self::ENDPOINT_SANDBOX);
+        } else {
+            $this->setEndpoint(self::ENDPOINT_PRODUCTION);
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return array
+     */
+    public function getHttpResponse()
+    {
+        return $this->httpResponse;
+    }
+
+    /**
+     * @param array $httpResponse
+     */
+    public function setHttpResponse($httpResponse)
+    {
+        $this->httpResponse = $httpResponse;
+    }
+
 }
