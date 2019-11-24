@@ -2,19 +2,35 @@
 
 namespace ReceiptValidator\GooglePlay;
 
-class ServiceAccountValidator extends AbstractValidator
+class ServiceAccountValidator
 {
-    protected function initClient($options = [])
+    /**
+     * @var \ReceiptValidator\GooglePlay\Validator
+     */
+    private $validator;
+
+    /**
+     * ServiceAccountValidator constructor.
+     *
+     * @param array $options
+     *
+     * @throws \Google_Exception
+     */
+    public function __construct($options = [])
     {
-        $credentials = new \Google_Auth_AssertionCredentials(
-            $options['client_email'],
-            [\Google_Service_AndroidPublisher::ANDROIDPUBLISHER],
-            file_get_contents($options['p12_key_path'])
-        );
-        $this->_client = new \Google_Client();
-        $this->_client->setAssertionCredentials($credentials);
-        if ($this->_client->getAuth()->isAccessTokenExpired()) {
-            $this->_client->getAuth()->refreshTokenWithAssertion();
-        }
+        $googleClient = new \Google_Client();
+        $googleClient->setScopes([\Google_Service_AndroidPublisher::ANDROIDPUBLISHER]);
+        $googleClient->setApplicationName($options['application_name']);
+        $googleClient->setAuthConfig($options['path_to_service_account_json']);
+
+        $this->validator = new \ReceiptValidator\GooglePlay\Validator(new \Google_Service_AndroidPublisher($googleClient));
+    }
+
+    /**
+     * @return Validator
+     */
+    public function getValidator()
+    {
+        return $this->validator;
     }
 }
